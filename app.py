@@ -3,6 +3,8 @@ import streamlit as st
 
 from search import search_document
 
+from rag import answer_question
+
 st.set_page_config(page_title="FinlandDoc AI", page_icon="📚")
 
 st.title("FinlandDoc AI")
@@ -33,16 +35,28 @@ document = st.text_area(
 
 question = st.text_input("Mitä haluat tietää?")
 
+
 if st.button("Etsi"):
     if not document.strip() or not question.strip():
         st.warning("Anna dokumentti ja kysymys.")
     else:
-        matches = search_document(document, question)
+        try:
+            result = answer_question(document, question)
 
-        if matches:
-            st.subheader("Löydetyt kohdat")
+            st.subheader("Vastaus")
+            st.write(result["answer"])
 
-            for index, match in enumerate(matches, start=1):
-                st.markdown(f"**{index}.** {match}")
-        else:
-            st.info("Sopivaa kohtaa ei löytynyt.")
+            if result["sources"]:
+                st.subheader("Lähteet")
+
+                for index, source in enumerate(
+                    result["sources"], start=1
+                ):
+                    st.markdown(f"**Lähde {index}:** {source}")
+
+        except RuntimeError as error:
+            st.error(str(error))
+        except Exception as error:
+            st.error(
+        f"Virhe: {type(error).__name__}: {error}"
+            )   
