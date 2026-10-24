@@ -1,14 +1,20 @@
 
 import streamlit as st
 
-from search import search_document
-
 from rag import answer_question
 
-st.set_page_config(page_title="FinlandDoc AI", page_icon="📚")
 
-st.title("FinlandDoc AI")
-st.write("Suomenkielisten dokumenttien älykäs haku")
+st.set_page_config(
+    page_title="FinlandDoc AI",
+    page_icon="📚",
+    layout="centered",
+)
+
+st.title("📚 FinlandDoc AI")
+st.write(
+    "Suomenkielisten dokumenttien älykäs haku. "
+    "Saat vastauksen dokumentin sisällön perusteella."
+)
 
 uploaded_file = st.file_uploader(
     "Lataa tekstidokumentti (.txt)",
@@ -23,7 +29,7 @@ if uploaded_file is not None:
     else:
         try:
             document = uploaded_file.getvalue().decode("utf-8")
-            st.success("Dokumentti ladattu.")
+            st.success("Dokumentti ladattu onnistuneesti.")
         except UnicodeDecodeError:
             st.error("Tiedoston pitää olla UTF-8-koodattua tekstiä.")
 
@@ -31,32 +37,42 @@ document = st.text_area(
     "Dokumentin teksti",
     value=document,
     height=200,
+    placeholder="Liitä dokumentin teksti tähän...",
 )
 
-question = st.text_input("Mitä haluat tietää?")
+question = st.text_input(
+    "Mitä haluat tietää dokumentista?",
+    placeholder="Esim. Miten vuosilomaa haetaan?",
+)
 
-
-if st.button("Etsi"):
+if st.button("Etsi vastaus", type="primary"):
     if not document.strip() or not question.strip():
-        st.warning("Anna dokumentti ja kysymys.")
+        st.warning("Anna sekä dokumentti että kysymys.")
     else:
         try:
-            result = answer_question(document, question)
+            with st.spinner("Etsitään vastausta dokumentista..."):
+                result = answer_question(document, question)
 
             st.subheader("Vastaus")
-            st.write(result["answer"])
 
-            if result["sources"]:
-                st.subheader("Lähteet")
+            if not result["sources"]:
+                st.info(
+                    "Dokumentista ei löytynyt kysymykseen sopivaa kohtaa."
+                )
+            else:
+                st.write(result["answer"])
+
+                st.subheader("Vastausta tukevat lähteet")
 
                 for index, source in enumerate(
                     result["sources"], start=1
                 ):
-                    st.markdown(f"**Lähde {index}:** {source}")
+                    with st.expander(f"Lähde {index}", expanded=True):
+                        st.write(source)
 
         except RuntimeError as error:
             st.error(str(error))
         except Exception as error:
             st.error(
-        f"Virhe: {type(error).__name__}: {error}"
-            )   
+                f"Odottamaton virhe: {type(error).__name__}: {error}"
+            )

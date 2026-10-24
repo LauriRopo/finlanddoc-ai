@@ -1,7 +1,31 @@
 
+import os
+import re
+
+from dotenv import load_dotenv
 from openai import OpenAI
 
 from search import search_document
+
+
+load_dotenv()
+
+API_KEY = os.getenv("OPENAI_API_KEY")
+BASE_URL = os.getenv("OPENAI_BASE_URL")
+MODEL = os.getenv("OPENAI_MODEL")
+
+
+def validate_citations(answer: str, source_count: int) -> bool:
+    """Check that cited source numbers exist."""
+    citations = re.findall(r"\[Lähde\s+(\d+)\]", answer)
+
+    if not citations:
+        return False
+
+    return all(
+        1 <= int(citation) <= source_count
+        for citation in citations
+    )
 
 
 def answer_question(document: str, question: str) -> dict:
@@ -14,9 +38,14 @@ def answer_question(document: str, question: str) -> dict:
             "sources": [],
         }
 
+    if not API_KEY or not BASE_URL or not MODEL:
+        raise RuntimeError(
+            "Mallin asetukset puuttuvat .env-tiedostosta."
+        )
+
     client = OpenAI(
-        base_url="http://localhost:11434/v1",
-        api_key="ollama",
+        base_url=BASE_URL,
+        api_key=API_KEY,
     )
 
     context = "\n".join(
@@ -25,7 +54,7 @@ def answer_question(document: str, question: str) -> dict:
     )
 
     response = client.responses.create(
-        model="qwen3:8b",
+        model=MODEL,
         instructions=(
             "Vastaa käyttäjän kysymykseen vain annettujen lähteiden perusteella. "
             "Vastaa suomeksi. Jos lähteet eivät sisällä vastausta, kerro se "
@@ -39,7 +68,15 @@ def answer_question(document: str, question: str) -> dict:
         ),
     )
 
+    answer = response.output_text.strip()
+
+    if not validate_citations(answer, len(passages)):
+        answer = (
+            "Tekoälyn vastausta ei voitu vahvistaa kelvollisilla "
+            "lähdeviitteillä. Tarkista lähteet ja kokeile kysymystä uudelleen."
+        )
+
     return {
-        "answer": response.output_text,
+        "answer": answer,
         "sources": passages,
     }
